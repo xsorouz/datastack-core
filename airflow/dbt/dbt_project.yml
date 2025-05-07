@@ -1,0 +1,18 @@
+# dbt/dbt_project.yml
+# Configuration du projet dbt pour la stack générique
+
+name: 'data_platform_stack'
+version: '1.0'
+profile: 'default'
+
+source-paths: ['models']
+target-path: 'target'
+packages-install-path: 'dbt_packages'
+
+analysis-paths: ['analysis']
+macro-paths: ['macros']
+data-paths: ['data']
+
+models:
+  data_platform_stack:
+    +materialized: view

@@ -1,0 +1,31 @@
+# ========================================================
+# 📦 Extension MongoDB — docker-compose.override.mongodb.yml
+# MongoDB est une base orientée documents (NoSQL)
+# Utile pour stocker des données semi-structurées comme du JSON
+# ========================================================
+
+services:
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"  # Port MongoDB standard
+    volumes:
+      - ./mongo/data:/data/db
+    networks:
+      - datastack_net
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    restart: unless-stopped
+    ports:
+      - "8083:8081"  # Interface web Mongo Express
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+    depends_on:
+      - mongo
+    networks:
+      - datastack_net

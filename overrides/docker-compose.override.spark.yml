@@ -1,0 +1,31 @@
+# ========================================================
+# 🔁 Extension Spark — docker-compose.override.spark.yml
+# Ajoute Apache Spark (standalone) pour traitements distribués
+# Utilisé pour le calcul parallèle (batch, ETL, ML)
+# ========================================================
+
+services:
+
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"   # Port du cluster Spark
+      - "8088:8080"   # Interface web Spark Master
+    networks:
+      - datastack_net
+
+  spark-worker:
+    image: bitnami/spark:latest
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    ports:
+      - "8089:8081"   # Interface web Spark Worker
+    networks:
+      - datastack_net

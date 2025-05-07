@@ -1,0 +1,17 @@
+# ========================================================
+# 📡 Extension Redpanda — docker-compose.override.redpanda.yml
+# Redpanda est une alternative à Kafka, compatible mais plus rapide
+# Utilisé pour la gestion de flux de données (streaming temps réel)
+# ========================================================
+
+services:
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: stack-redpanda
+    command: redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --node-id 0 --check=false
+    ports:
+      - "9092:9092"   # Port Kafka compatible
+      - "9644:9644"   # Redpanda Admin API
+    networks:
+      - datastack_net

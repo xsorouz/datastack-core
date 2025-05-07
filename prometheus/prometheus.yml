@@ -1,0 +1,45 @@
+# ===========================================
+# prometheus.yml — Configuration du monitoring
+# ===========================================
+#
+# Ce fichier définit les cibles que Prometheus va surveiller.
+# Chaque job représente un service à observer (Airflow, Redis...)
+#
+# Emplacement : prometheus/prometheus.yml
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ✅ Monitoring de Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ✅ Monitoring Redis (statistiques de cache et exécution)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['stack-redis:6379']
+
+  # 🔧 Monitoring PostgreSQL (via exporter, optionnel)
+  # Requiert postgres_exporter (non inclus dans cette stack par défaut)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres_exporter:9187']
+
+  # ✅ Monitoring Airflow (via endpoint `/admin/metrics`)
+  - job_name: 'airflow'
+    metrics_path: /admin/metrics
+    static_configs:
+      - targets: ['stack-airflow-webserver:8080']
+
+  # ✅ Monitoring Flower (Celery workers)
+  - job_name: 'flower'
+    static_configs:
+      - targets: ['stack-flower:5555']
+
+  # 🔧 Monitoring Docker (via cAdvisor ou exporter) — optionnel
+  # - job_name: 'docker'
+  #   static_configs:
+  #     - targets: ['host.docker.internal:9323']

@@ -1,0 +1,299 @@
+# ========================================================
+# 🧱 Stack Data Platform + RAG — docker-compose.yml
+# Objectif : orchestrer, stocker, analyser, monitorer et enrichir des données
+# Cette stack inclut Airflow, MinIO, Trino, Grafana, PostgreSQL, Redis, Metabase, Prometheus, etc.
+# Elle peut être étendue via des fichiers docker-compose.override.yml (Airbyte, Spark, Redpanda, MongoDB...)
+# ========================================================
+
+# 🔗 Réseau privé partagé entre tous les services
+networks:
+  datastack_net:
+    driver: bridge
+
+# 💾 Volumes persistants pour stocker les données des services critiques
+volumes:
+  postgres_data:
+  minio_data:
+  qdrant_data:
+  grafana_data:
+  ollama_data:
+
+# ♻️ Variables d’environnement communes à tous les conteneurs Airflow
+x-airflow-defaults: &airflow-env
+  AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@stack-postgres/airflow
+  AIRFLOW__CELERY__BROKER_URL: redis://stack-redis:6379/0
+  AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@stack-postgres/airflow
+
+services:
+
+  # ================================
+  # 🗃️ BASES DE DONNÉES BACKEND
+  # ================================
+
+  # 📦 PostgreSQL — Stockage des métadonnées Airflow, Metabase et autres
+  stack-postgres:
+    image: postgres:15
+    container_name: stack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - datastack_net
+
+  # 🔁 Redis — Broker de messages pour exécuter les tâches Airflow via Celery
+  stack-redis:
+    image: redis:alpine
+    container_name: stack-redis
+    restart: unless-stopped
+    networks:
+      - datastack_net
+
+  # ================================
+  # ☁️ STOCKAGE OBJETS
+  # ================================
+
+  # 🪣 MinIO — Alternative S3 pour stocker fichiers, dumps, exports, logs, etc.
+  stack-minio:
+    image: minio/minio
+    container_name: stack-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console Web
+    volumes:
+      - minio_data:/data
+    networks:
+      - datastack_net
+
+  # ================================
+  # ⚙️ ORCHESTRATION DES FLUX — AIRFLOW
+  # ================================
+
+  # ⚙️ airflow-init — Initialisation d’Airflow : DB, compte admin, pip install
+  stack-airflow-init:
+    build: .
+    image: apache/airflow:2.9.0-python3.10
+    container_name: stack-airflow-init
+    restart: "no"
+    depends_on:
+      - stack-postgres
+      - stack-redis
+    environment:
+      <<: *airflow-env
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/dbt:/opt/airflow/dbt
+      - ./airflow/great_expectations:/opt/airflow/great_expectations
+      - ./requirements.txt:/requirements.txt
+    entrypoint:
+      - bash
+      - -c
+      - |
+        pip install -r /requirements.txt && \
+        airflow db init && \
+        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin
+    networks:
+      - datastack_net
+
+  # 🌐 Airflow Webserver — Interface utilisateur principale (http://localhost:8082)
+  stack-airflow-webserver:
+    build: .
+    image: apache/airflow:2.9.0-python3.10
+    container_name: stack-airflow-webserver
+    restart: unless-stopped
+    depends_on:
+      - stack-airflow-init
+    environment:
+      <<: *airflow-env
+    ports:
+      - "8082:8080"
+    command: webserver
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/dbt:/opt/airflow/dbt
+      - ./airflow/great_expectations:/opt/airflow/great_expectations
+      - ./requirements.txt:/requirements.txt
+    networks:
+      - datastack_net
+
+  # ⏱️ Scheduler — Planifie les DAGs à exécuter
+  stack-airflow-scheduler:
+    build: .
+    image: apache/airflow:2.9.0-python3.10
+    container_name: stack-airflow-scheduler
+    restart: unless-stopped
+    depends_on:
+      - stack-airflow-webserver
+    environment:
+      <<: *airflow-env
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/dbt:/opt/airflow/dbt
+      - ./airflow/great_expectations:/opt/airflow/great_expectations
+      - ./requirements.txt:/requirements.txt
+    networks:
+      - datastack_net
+
+  # 👷 Worker — Exécute les tâches Airflow via Celery
+  stack-airflow-worker:
+    build: .
+    image: apache/airflow:2.9.0-python3.10
+    container_name: stack-airflow-worker
+    restart: unless-stopped
+    depends_on:
+      - stack-airflow-scheduler
+    environment:
+      <<: *airflow-env
+    command: celery worker
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/dbt:/opt/airflow/dbt
+      - ./airflow/great_expectations:/opt/airflow/great_expectations
+      - ./requirements.txt:/requirements.txt
+    networks:
+      - datastack_net
+
+  # 🌸 Flower — UI de monitoring pour les workers Celery (http://localhost:5556)
+  stack-flower:
+    build: .
+    image: apache/airflow:2.9.0-python3.10
+    container_name: stack-flower
+    restart: unless-stopped
+    command: celery flower
+    depends_on:
+      - stack-redis
+      - stack-airflow-worker
+    environment:
+      <<: *airflow-env
+    ports:
+      - "5556:5555"
+    volumes:
+      - ./requirements.txt:/requirements.txt
+    networks:
+      - datastack_net
+
+  # ================================
+  # 📊 ANALYSE / BI
+  # ================================
+
+  # 📈 Metabase — Plateforme d'exploration de données et dataviz
+  stack-metabase:
+    image: metabase/metabase
+    container_name: stack-metabase
+    restart: unless-stopped
+    depends_on:
+      - stack-postgres
+    ports:
+      - "3000:3000"
+    networks:
+      - datastack_net
+
+  # 🔎 Trino — Moteur SQL fédéré (requêtes multi-sources)
+  stack-trino:
+    image: trinodb/trino:latest
+    container_name: stack-trino
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+      - ./trino/etc/core-site.xml:/etc/trino/core-site.xml
+    networks:
+      - datastack_net
+
+  # ================================
+  # 🧠 RAG (VECTOR DB + LLM)
+  # ================================
+
+  # 🧩 Qdrant — Base vectorielle pour les embeddings et la recherche sémantique
+  stack-qdrant:
+    image: qdrant/qdrant
+    container_name: stack-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - datastack_net
+
+  # 🤖 Ollama — Serveur d’API locale pour modèles LLM (Mistral, LLaMA, etc.)
+  stack-ollama:
+    image: ollama/ollama
+    container_name: stack-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - datastack_net
+
+  # ================================
+  # 🛠️ MONITORING
+  # ================================
+
+  # 📡 Prometheus — Collecte et scrape des métriques (MinIO, Airflow, etc.)
+  stack-prometheus:
+    image: prom/prometheus
+    container_name: stack-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - datastack_net
+
+  # 📊 Grafana — Visualisation des métriques Prometheus (http://localhost:3001)
+  stack-grafana:
+    image: grafana/grafana
+    container_name: stack-grafana
+    restart: unless-stopped
+    depends_on:
+      - stack-prometheus
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - datastack_net
+
+  # ================================
+  # 🌐 REVERSE PROXY CENTRALISÉ
+  # ================================
+
+  # 🧭 Nginx — Reverse proxy unifié (http://localhost)
+  stack-nginx:
+    image: nginx:latest
+    container_name: stack-nginx
+    restart: unless-stopped
+    depends_on:
+      - stack-airflow-webserver
+      - stack-metabase
+      - stack-minio
+      - stack-grafana
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - datastack_net

@@ -1,0 +1,19 @@
+# ========================================================
+# 📊 Extension ClickHouse — docker-compose.override.clickhouse.yml
+# ClickHouse est une base analytique en colonnes ultra rapide
+# Utilisée pour les requêtes massives sur gros volumes
+# ========================================================
+
+services:
+
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: stack-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP interface
+    volumes:
+      - ./clickhouse:/var/lib/clickhouse
+    networks:
+      - datastack_net

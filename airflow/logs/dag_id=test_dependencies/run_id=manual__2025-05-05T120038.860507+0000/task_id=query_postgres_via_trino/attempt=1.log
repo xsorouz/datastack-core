@@ -1,0 +1,21 @@
+[2025-05-05T12:00:44.308+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2025-05-05T12:00:44.325+0000] {taskinstance.py:2073} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: test_dependencies.query_postgres_via_trino manual__2025-05-05T12:00:38.860507+00:00 [queued]>
+[2025-05-05T12:00:44.331+0000] {taskinstance.py:2073} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: test_dependencies.query_postgres_via_trino manual__2025-05-05T12:00:38.860507+00:00 [queued]>
+[2025-05-05T12:00:44.331+0000] {taskinstance.py:2303} INFO - Starting attempt 1 of 1
+[2025-05-05T12:00:44.341+0000] {taskinstance.py:2327} INFO - Executing <Task(PythonOperator): query_postgres_via_trino> on 2025-05-05 12:00:38.860507+00:00
+[2025-05-05T12:00:44.346+0000] {standard_task_runner.py:63} INFO - Started process 88 to run task
+[2025-05-05T12:00:44.349+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'test_dependencies', 'query_postgres_via_trino', 'manual__2025-05-05T12:00:38.860507+00:00', '--job-id', '6', '--raw', '--subdir', 'DAGS_FOLDER/test_dependencies.py', '--cfg-path', '/tmp/tmpa5bpob3a']
+[2025-05-05T12:00:44.351+0000] {standard_task_runner.py:91} INFO - Job 6: Subtask query_postgres_via_trino
+[2025-05-05T12:00:44.362+0000] {warnings.py:109} WARNING - /home/***/.local/lib/python3.10/site-packages/***/settings.py:195: DeprecationWarning: The sql_alchemy_conn option in [core] has been moved to the sql_alchemy_conn option in [database] - the old setting has been used, but please update your config.
+  SQL_ALCHEMY_CONN = conf.get("database", "SQL_ALCHEMY_CONN")
+
+[2025-05-05T12:00:44.396+0000] {task_command.py:426} INFO - Running <TaskInstance: test_dependencies.query_postgres_via_trino manual__2025-05-05T12:00:38.860507+00:00 [running]> on host f9aab667203b
+[2025-05-05T12:00:44.455+0000] {taskinstance.py:2644} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='***' AIRFLOW_CTX_DAG_ID='test_dependencies' AIRFLOW_CTX_TASK_ID='query_postgres_via_trino' AIRFLOW_CTX_EXECUTION_DATE='2025-05-05T12:00:38.860507+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-05-05T12:00:38.860507+00:00'
+[2025-05-05T12:00:44.456+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2025-05-05T12:00:44.764+0000] {test_dependencies.py:72} WARNING - Trino query failed : TrinoUserError(type=USER_ERROR, name=TABLE_NOT_FOUND, message="line 1:15: Table 'postgresql.public.some_table' does not exist", query_id=20250505_120044_00000_jns3d)
+[2025-05-05T12:00:44.765+0000] {python.py:237} INFO - Done. Returned value was: None
+[2025-05-05T12:00:44.766+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2025-05-05T12:00:44.774+0000] {taskinstance.py:1205} INFO - Marking task as SUCCESS. dag_id=test_dependencies, task_id=query_postgres_via_trino, execution_date=20250505T120038, start_date=20250505T120044, end_date=20250505T120044
+[2025-05-05T12:00:44.803+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 0
+[2025-05-05T12:00:44.817+0000] {taskinstance.py:3482} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2025-05-05T12:00:44.819+0000] {local_task_job_runner.py:222} INFO - ::endgroup::
